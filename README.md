@@ -32,9 +32,9 @@ Usage
 CLI
 
 Run:
-bash
+```
 python app/nmap_ai_wrapper.py --input examples/scan.xml --output outputs/report.txt --model-provider huggingface --model-name distilgpt2
-
+```
 Options:
 ```
     --model-provider: huggingface, openai, deepseek, grok
