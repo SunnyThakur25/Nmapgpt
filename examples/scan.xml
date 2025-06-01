@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV -O -oX scan.xml" start="1625149200" version="7.91">
+    <host>
+        <address addr="192.168.1.1" addrtype="ipv4"/>
+        <status state="up"/>
+        <ports>
+            <port protocol="tcp" portid="80">
+                <state state="open"/>
+                <service name="http" product="Apache httpd" version="2.4.41" extrainfo="(Ubuntu)"/>
+            </port>
+            <port protocol="tcp" portid="22">
+                <state state="open"/>
+                <service name="ssh" product="OpenSSH" version="7.6p1" extrainfo="Ubuntu 4ubuntu0.3"/>
+            </port>
+            <port protocol="tcp" portid="445">
+                <state state="open"/>
+                <service name="microsoft-ds" product="Samba smbd" version="4.7.6"/>
+            </port>
+        </ports>
+        <os>
+            <osmatch name="Linux 4.15 - 5.4" accuracy="95"/>
+        </os>
+    </host>
+    <host>
+        <address addr="192.168.1.2" addrtype="ipv4"/>
+        <status state="up"/>
+        <ports>
+            <port protocol="tcp" portid="21">
+                <state state="open"/>
+                <service name="ftp" product="vsftpd" version="3.0.3"/>
+            </port>
+            <port protocol="tcp" portid="23">
+                <state state="open"/>
+                <service name="telnet" product="Linux telnetd"/>
+            </port>
+        </ports>
+        <os>
+            <osmatch name="Linux 3.10 - 4.11" accuracy="90"/>
+        </os>
+    </host>
+</nmaprun>
