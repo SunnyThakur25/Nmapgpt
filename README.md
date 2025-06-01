@@ -11,7 +11,7 @@ Setup
         Virtual environment recommended
         API keys for OpenAI, DeepSeek, or Grok (optional)
     Install Dependencies:
-    bash
+    
 ```
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
