@@ -1,13 +1,13 @@
 import logging
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import requests
-from transformers import pipeline
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 import torch
 from dotenv import load_dotenv
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -17,13 +17,13 @@ class AIEngine:
     """
     Handles AI-based analysis of Nmap scan results with support for multiple providers.
     """
-    def __init__(self, model_provider: str = "huggingface", model_name: str = "distilgpt2"):
+    def __init__(self, model_provider: str = "huggingface", model_name: str = "deepseek/deepseek-coder-6.7b-instruct"):
         """
         Initialize AI engine with specified provider and model.
 
         Args:
             model_provider (str): AI provider ('huggingface', 'openai', 'deepseek', 'grok')
-            model_name (str): Model name (e.g., 'distilgpt2', 'gpt-3.5-turbo', 'grok')
+            model_name (str): Model name (e.g., 'deepseek/deepseek-coder-6.7b-instruct', 'gpt-3.5-turbo')
 
         Raises:
             ValueError: If provider or credentials are invalid
@@ -35,13 +35,34 @@ class AIEngine:
             'deepseek': os.getenv("DEEPSEEK_API_KEY"),
             'grok': os.getenv("XAI_API_KEY")
         }
+        self.hf_token = os.getenv("HF_TOKEN")
 
         if self.model_provider == "huggingface":
             logger.info(f"Initializing Hugging Face model: {model_name}")
             try:
-                # Use PyTorch for lightweight models (distilgpt2, mistral)
-                self.model = pipeline('text-generation', model=model_name, framework='pt',
-                                    device=0 if torch.cuda.is_available() else -1)
+                # Use token only for gated models
+                token = self.hf_token if model_name.startswith("meta-llama/") else None
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    model_name,
+                    token=token
+                )
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_name,
+                    token=token,
+                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                    device_map="auto"
+                )
+                self.pipeline = pipeline(
+                    'text-generation',
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    framework='pt',
+                    device_map="auto",
+                    max_new_tokens=1500,
+                    do_sample=True,
+                    temperature=0.7,
+                    top_p=0.9
+                )
             except Exception as e:
                 logger.error(f"Failed to load Hugging Face model: {str(e)}")
                 raise
@@ -51,21 +72,12 @@ class AIEngine:
                 logger.error(f"{self.model_provider.upper()} API key not found in .env")
                 raise ValueError(f"{self.model_provider.upper()} API key required")
         else:
-            logger.error(f"Unsupported model provider: {self.model_provider}")
-            raise ValueError(f"Unsupported model provider: {self.model_provider}")
+            logger.error(f"Unsupported model provider: {model_provider}")
+            raise ValueError(f"Unsupported model provider: {model_provider}")
 
     def load_prompt_template(self, template_path: str) -> str:
         """
         Load prompt template from file.
-
-        Args:
-            template_path (str): Path to prompt template file
-
-        Returns:
-            str: Prompt template content
-
-        Raises:
-            FileNotFoundError: If template file doesn't exist
         """
         try:
             with open(template_path, 'r') as f:
@@ -77,12 +89,6 @@ class AIEngine:
     def format_services(self, services: Dict[str, Any]) -> str:
         """
         Format Nmap parsed data into a string for the prompt.
-
-        Args:
-            services (Dict): Parsed Nmap data {host: {ports: {port: {service, version}}}}
-
-        Returns:
-            str: Formatted string of services
         """
         formatted = []
         for host, data in services.items():
@@ -97,16 +103,6 @@ class AIEngine:
     def analyze_services(self, services: Dict[str, Any], prompt_template_path: str) -> str:
         """
         Analyze Nmap services using the specified AI model.
-
-        Args:
-            services (Dict): Parsed Nmap data
-            prompt_template_path (str): Path to prompt template
-
-        Returns:
-            str: AI-generated analysis
-
-        Raises:
-            Exception: For API or model errors
         """
         try:
             services_str = self.format_services(services)
@@ -114,18 +110,17 @@ class AIEngine:
             logger.info(f"Generating AI analysis with {self.model_provider} ({self.model_name})")
 
             if self.model_provider == "huggingface":
-                # Lightweight Hugging Face models (e.g., distilgpt2, mistral)
-                result = self.model(prompt, max_length=500, num_return_sequences=1,
-                                 do_sample=True, temperature=0.7)[0]['generated_text']
-                return result.strip()
+                result = self.pipeline(prompt)[0]['generated_text'].strip()
+                return result
 
             elif self.model_provider == "openai":
                 headers = {"Authorization": f"Bearer {self.api_key['openai']}", "Content-Type": "application/json"}
                 payload = {
                     "model": self.model_name,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500,
-                    "temperature": 0.7
+                    "max_tokens": 1500,
+                    "temperature": 0.7,
+                    "top_p": 0.9
                 }
                 response = requests.post(
                     "https://api.openai.com/v1/chat/completions",
@@ -140,8 +135,10 @@ class AIEngine:
                 payload = {
                     "model": self.model_name,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500,
-                    "temperature": 0.7
+                    "max_tokens": 1500,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "stream": False
                 }
                 response = requests.post(
                     "https://api.deepseek.com/v1/chat/completions",
@@ -156,8 +153,10 @@ class AIEngine:
                 payload = {
                     "model": self.model_name,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500,
-                    "temperature": 0.7
+                    "max_tokens": 1500,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "stream": False
                 }
                 response = requests.post(
                     "https://api.x.ai/v1/chat/completions",
@@ -174,12 +173,5 @@ class AIEngine:
     def suggest_exploits(self, services: Dict[str, Any], prompt_template_path: str = "models/prompts/exploit_suggestion.txt") -> str:
         """
         Public method to analyze services and suggest exploits.
-
-        Args:
-            services (Dict): Parsed Nmap data
-            prompt_template_path (str): Path to prompt template
-
-        Returns:
-            str: Exploit suggestions
         """
         return self.analyze_services(services, prompt_template_path)
