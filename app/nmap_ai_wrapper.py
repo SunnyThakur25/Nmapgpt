@@ -1,140 +1,98 @@
-#!/usr/bin/env python3
-"""
-NmapGPT CLI - AI-powered Nmap scan analysis tool
-"""
-
 import argparse
-import logging
 import os
-import sys
-from typing import Dict, Any
-
-from app.parser import parse_nmap_xml
+import subprocess
+import logging
+from app.parser import NmapParser
 from app.ai_engine import AIEngine
 
-class NmapGPTCLI:
-    """Main CLI application class for NmapGPT."""
-    
-    def __init__(self):
-        self.configure_logging()
-        self.args = self.parse_arguments()
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def run_nmap_scan(target: str, options: str, output_file: str) -> str:
+    """
+    Run Nmap scan and save results as XML.
+
+    Args:
+        target (str): Target IP or range (e.g., '192.168.1.1' or '192.168.1.0/24')
+        options (str): Nmap options (e.g., '-sV -O')
+        output_file (str): Path to save XML output
+
+    Returns:
+        str: Path to generated XML file
+    """
+    try:
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         
-    @staticmethod
-    def configure_logging() -> None:
-        """Set up basic logging configuration."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('nmapgpt.log'),
-                logging.StreamHandler()
-            ]
-        )
-        logger = logging.getLogger(__name__)
-        logger.info("Logging configured")
-
-    def parse_arguments(self) -> argparse.Namespace:
-        """Parse and validate command line arguments."""
-        parser = argparse.ArgumentParser(
-            description="NmapGPT: AI-driven Nmap scan analysis",
-            epilog="Example: nmapgpt --input scan.xml --output report.txt"
-        )
+        # Construct Nmap command
+        cmd = f"nmap {options} -oX {output_file} {target}"
+        logger.info(f"Running Nmap command: {cmd}")
         
-        parser.add_argument(
-            "-i", "--input",
-            required=True,
-            help="Path to Nmap XML input file"
-        )
+        # Execute Nmap
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"Nmap scan failed: {result.stderr}")
+            raise RuntimeError(f"Nmap scan failed: {result.stderr}")
         
-        parser.add_argument(
-            "-o", "--output",
-            default="outputs/analysis_report.txt",
-            help="Path to output report file"
-        )
+        if not os.path.exists(output_file):
+            logger.error(f"Nmap output file not created: {output_file}")
+            raise FileNotFoundError(f"Nmap output file not created: {output_file}")
         
-        parser.add_argument(
-            "-p", "--model-provider",
-            default="huggingface",
-            choices=["huggingface", "openai", "deepseek", "grok"],
-            help="AI model provider"
-        )
-        
-        parser.add_argument(
-            "-m", "--model-name",
-            default="distilgpt2",
-            help="Model name (e.g., distilgpt2, gpt-3.5-turbo)"
-        )
-        
-        parser.add_argument(
-            "-t", "--prompt-template",
-            default="models/prompts/exploit_suggestion.txt",
-            help="Path to prompt template file"
-        )
-        
-        return parser.parse_args()
-
-    def validate_file(self, file_path: str, extension: str) -> bool:
-        """Validate file existence and extension."""
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
-            
-        if not file_path.lower().endswith(extension.lower()):
-            raise ValueError(f"File must have {extension} extension")
-            
-        return True
-
-    def ensure_output_dir(self, output_path: str) -> None:
-        """Ensure output directory exists."""
-        output_dir = os.path.dirname(output_path)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir, exist_ok=True)
-            logging.info(f"Created output directory: {output_dir}")
-
-    def run_analysis(self) -> None:
-        """Execute the complete analysis workflow."""
-        try:
-            # Validate inputs
-            self.validate_file(self.args.input, ".xml")
-            self.validate_file(self.args.prompt_template, ".txt")
-            self.ensure_output_dir(self.args.output)
-
-            # Process scan file
-            logging.info(f"Processing input file: {self.args.input}")
-            services = parse_nmap_xml(self.args.input)
-            
-            if not services:
-                logging.warning("No valid data parsed from XML")
-                sys.exit(1)
-
-            # Initialize and run AI analysis
-            ai_engine = AIEngine(
-                model_provider=self.args.model_provider,
-                model_name=self.args.model_name
-            )
-            
-            logging.info("Starting AI analysis")
-            analysis = ai_engine.suggest_exploits(
-                services,
-                self.args.prompt_template
-            )
-
-            # Save results
-            with open(self.args.output, 'w') as f:
-                f.write(analysis)
-                
-            logging.info(f"Analysis saved to: {self.args.output}")
-            print(f"\n[+] Analysis completed successfully!")
-            print(f"    Results saved to: {self.args.output}")
-
-        except Exception as e:
-            logging.exception("Analysis failed")
-            print(f"\n[!] Error: {str(e)}", file=sys.stderr)
-            sys.exit(1)
+        logger.info(f"Nmap scan completed, XML saved to: {output_file}")
+        return output_file
+    except Exception as e:
+        logger.error(f"Error running Nmap scan: {str(e)}")
+        raise
 
 def main():
-    """Entry point for the CLI application."""
-    cli = NmapGPTCLI()
-    cli.run_analysis()
+    parser = argparse.ArgumentParser(description="NmapGPT: AI-driven Nmap scan analysis")
+    parser.add_argument("--scan", action="store_true", help="Run Nmap scan")
+    parser.add_argument("--target", type=str, help="Target IP or range for Nmap scan")
+    parser.add_argument("--options", type=str, default="-sV -O", help="Nmap scan options (default: -sV -O)")
+    parser.add_argument("--input", type=str, help="Input Nmap XML file for analysis")
+    parser.add_argument("--output", type=str, default="outputs/analysis_report.txt", help="Output file for AI analysis")
+    parser.add_argument("--model-provider", type=str, default="huggingface", help="AI model provider (huggingface, openai, deepseek, grok)")
+    parser.add_argument("--model-name", type=str, default="deepseek/deepseek-coder-6.7b-instruct", help="AI model name")
+    parser.add_argument("--prompt-template", type=str, default="models/prompts/exploit_suggestion.txt", help="Prompt template path")
+    
+    args = parser.parse_args()
+
+    try:
+        xml_file = args.input
+        
+        # Run Nmap scan if --scan is specified
+        if args.scan:
+            if not args.target:
+                raise ValueError("Target required for Nmap scan (--target)")
+            xml_file = f"outputs/scans/scan_{args.target.replace('/', '_')}.xml"
+            xml_file = run_nmap_scan(args.target, args.options, xml_file)
+        
+        if not xml_file:
+            raise ValueError("Input XML file or scan required")
+
+        # Parse Nmap XML
+        logger.info(f"Parsing Nmap XML: {xml_file}")
+        parser = NmapParser(xml_file)
+        services = parser.parse()
+
+        # Initialize AI engine
+        logger.info(f"Initializing AI engine with {args.model_provider} ({args.model_name})")
+        ai_engine = AIEngine(model_provider=args.model_provider, model_name=args.model_name)
+
+        # Analyze services
+        logger.info("Analyzing services with AI")
+        analysis = ai_engine.suggest_exploits(services, args.prompt_template)
+
+        # Save analysis
+        os.makedirs(os.path.dirname(args.output), exist_ok=True)
+        with open(args.output, 'w') as f:
+            f.write(analysis)
+        logger.info(f"Analysis saved to: {args.output}")
+
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     main()
