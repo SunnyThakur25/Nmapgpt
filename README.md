@@ -160,3 +160,12 @@ MIT License. See LICENSE for details.
 Contact
 For support, contact sunny48445@gmail.com or raise an issue on GitHub.
 Last Updated: June 2, 2025
+
+
+# screen shots
+
+![nmap 1](https://github.com/user-attachments/assets/6fe448b8-2371-4406-ba9c-0cd61b68ee24)
+![nmap3](https://github.com/user-attachments/assets/4f63b127-f0a9-40e8-b292-79a071891ddb)
+![nmap2](https://github.com/user-attachments/assets/401f16ec-d782-46b0-955d-6d2e77a5d15f)
+
+
