@@ -1,8 +1,9 @@
-     transformers
-     lxml
-     beautifulsoup4
-     streamlit
-     python-dotenv
-     requests
-     torch
-     
+transformers
+lxml
+beautifulsoup4
+streamlit
+python-dotenv
+requests
+torch
+accelerate
+huggingface_hub
