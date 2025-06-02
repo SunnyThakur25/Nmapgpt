@@ -2,7 +2,7 @@
 import unittest
 import os
 import xml.etree.ElementTree as ET
-from app.parser import parse_nmap_xml
+from app.parser import NmapParser
 import logging
 
 # Configure logging
@@ -68,7 +68,7 @@ class TestNmapParser(unittest.TestCase):
         Test parsing a valid Nmap XML file.
         """
         logger.info("Testing valid XML parsing")
-        result = parse_nmap_xml(self.valid_xml_file)
+        result = NmapParser(self.valid_xml_file)
         self.assertIsInstance(result, dict)
         self.assertIn("192.168.1.1", result)
         self.assertEqual(len(result["192.168.1.1"]["ports"]), 2)
@@ -82,7 +82,7 @@ class TestNmapParser(unittest.TestCase):
         Test parsing an empty Nmap XML file.
         """
         logger.info("Testing empty XML parsing")
-        result = parse_nmap_xml(self.empty_xml_file)
+        result = NmapParser(self.empty_xml_file)
         self.assertIsInstance(result, dict)
         self.assertEqual(len(result), 0)
 
@@ -92,7 +92,7 @@ class TestNmapParser(unittest.TestCase):
         """
         logger.info("Testing invalid XML parsing")
         with self.assertRaises(ET.ParseError):
-            parse_nmap_xml(self.invalid_xml_file)
+            NmapParser(self.invalid_xml_file)
 
     def test_missing_file(self):
         """
@@ -100,7 +100,7 @@ class TestNmapParser(unittest.TestCase):
         """
         logger.info("Testing missing file handling")
         with self.assertRaises(FileNotFoundError):
-            parse_nmap_xml(self.missing_file)
+            NmapParser(self.missing_file)
 
     def test_wrong_file_extension(self):
         """
@@ -111,7 +111,7 @@ class TestNmapParser(unittest.TestCase):
             f.write(self.valid_xml)
         try:
             with self.assertRaises(ValueError):
-                parse_nmap_xml("test_wrong.txt")
+                NmapParser("test_wrong.txt")
         finally:
             os.remove("test_wrong.txt")
             logger.info("Cleaned up test_wrong.txt")
