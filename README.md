@@ -59,12 +59,10 @@ Tested Streamlit UI on http://localhost:8501.
 AWS SageMaker:
 Configured GPU instances (e.g., ml.g4dn.xlarge) for deepseek/deepseek-coder-6.7b-instruct.
 Installed Nmap and dependencies.
-Ran Streamlit on port 8501 via Studio proxy.
+Run Streamlit on port 8501 via Studio proxy.
 
 
-Oracle Cloud Free Tier and GitHub Codespaces:
-Provided SSH and CLI setup instructions.
-Ensured compatibility with ARM and lightweight environments.
+
 
 
 
